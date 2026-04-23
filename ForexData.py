@@ -11,12 +11,15 @@ params = {
 
 # print(response.status_code)
 with open("forex_data.csv", "w", newline="") as file:
-    writer = csv.DictWriter(file, fieldnames=["Published_Date",
-                                              "Currency_iso3",
-                                              "Currency_Name",
-                                              "Unit",
-                                              "Buy_Rate",
-                                              "Sell_Rate"])
+    writer = csv.DictWriter(file, fieldnames=[
+        "Date",
+        "Published_Date",
+        "Currency_iso3",
+        "Currency_Name",
+        "Unit",
+        "Buy_Rate",
+        "Sell_Rate"
+        ])
     writer.writeheader()
 
     page = 1
@@ -31,16 +34,18 @@ with open("forex_data.csv", "w", newline="") as file:
 
             payload = forex_data["data"]["payload"]
 
-            for date in payload:
-                Published_Date = date["published_on"]
+            for day in payload:
+                Date = day["date"]
+                Published_Date = day["published_on"]
 
-                for rate in date["rates"]:
+                for rate in day["rates"]:
                     Currency_Iso = rate["currency"]["iso3"]
                     Currency_Name = rate["currency"]["name"]
                     Unit = rate["currency"]["unit"]
                     Buy_Rate = rate["buy"]
                     Sell_Rate = rate["sell"]
-                    writer.writerow({"Published_Date": Published_Date,
+                    writer.writerow({"Date": Date,
+                                    "Published_Date": Published_Date,
                                     "Currency_iso3": Currency_Iso,
                                     "Currency_Name": Currency_Name,
                                     "Unit": Unit, "Buy_Rate": Buy_Rate,
