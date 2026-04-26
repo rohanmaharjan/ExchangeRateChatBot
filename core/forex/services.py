@@ -1,7 +1,6 @@
 from forex.models import ExchangeRate, Currency
 import re
 
-
 def extract_currencies(text):
     # Get all currency ISO codes from DB (USD, EUR, INR...)
     codes = Currency.objects.values_list("iso3", flat=True)
@@ -13,7 +12,6 @@ def extract_currencies(text):
             found.append(code)
 
     return found
-
 
 def chatbot_response(user_input):
     text = user_input.lower()
@@ -81,9 +79,22 @@ def chatbot_response(user_input):
             f"which represents a percentage change of {result['percent']:.2f}%. "
             f"This helps in understanding the overall movement of the currency over time."
         )
+    
+    # Lowest rate
+    elif intent == "lowest":
+        r = lowest_buy_rate()
+
+        if not r:
+            return "No exchange rate data available."
+
+        return (
+            f"The lowest recorded buy rate belongs to {r.currency.iso3}, "
+            f"with a buy rate of {r.buy_rate}. "
+            f"This indicates it is currently the weakest among the available currencies."
+        )
 
     # Latest Rate
-    else:
+    elif intent == "latest":
         rate = get_latest_rate(currencies[0])
 
         if not rate:
@@ -94,7 +105,10 @@ def chatbot_response(user_input):
             f"and a sell rate of {rate.sell_rate} on {rate.day.date}. "
             f"This represents the most recent available forex value for that currency."
         )
+    else:
+        return "Sorry! Can't process the query"
 
+    
 
 def get_latest_rate(currency_code):
     return ExchangeRate.objects.filter(
@@ -155,17 +169,53 @@ def get_trend(currency):
         currency__iso3=currency
     ).order_by("day__date").values("day__date", "buy_rate")
 
-
 def detect_intent(text):
     text = text.lower()
 
-    if "compare" in text:
-        return "compare"
+    # Compare
+    compare_keywords = [
+        "compare", "difference", "vs", "versus", "between", "growth"
+    ]
 
-    if "highest" in text:
-        return "highest"
+    # Highest
+    highest_keywords = [
+        "highest", "strongest", "maximum", "max", "top", "best"
+    ]
 
-    if "change" in text or "trend" in text:
-        return "trend"
+    # Lowest
+    lowest_keywords = [
+        "lowest", "weakest", "minimum", "min", "least"
+    ]
 
-    return "latest"
+    # Change / Trend
+    trend_keywords = [
+        "change", "trend", "increase", "decrease",
+        "history", "movement", "progress"
+    ]
+
+    # Latest Rate
+    latest_keywords = [
+        "latest", "current", "today", "now", "rate"
+    ]
+
+    for word in compare_keywords:
+        if word in text:
+            return "compare"
+
+    for word in highest_keywords:
+        if word in text:
+            return "highest"
+
+    for word in lowest_keywords:
+        if word in text:
+            return "lowest"
+
+    for word in trend_keywords:
+        if word in text:
+            return "trend"
+
+    for word in latest_keywords:
+        if word in text:
+            return "latest"
+
+    return "unknown"
