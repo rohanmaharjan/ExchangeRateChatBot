@@ -34,9 +34,9 @@ def chatbot_response(user_input):
             c2 = currencies[1]
 
             return (
+                f"Here is the information related to buy rates of {c1} and {c2} using Nepali Rupee (NRP) issued by Nepal Rastra Bank."
                 f"The latest buy rate comparison shows that {c1} has a buy rate of "
                 f"{result[c1]}, while {c2} has a buy rate of {result[c2]}. "
-                f"This helps you understand which currency currently has a stronger exchange value."
             )
 
         return "Please mention two currencies to compare, for example: compare USD and EUR."
