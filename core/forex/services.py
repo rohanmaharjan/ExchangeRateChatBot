@@ -1,9 +1,6 @@
 from forex.models import ExchangeRate, Currency
-import re
 from forex.nlp_service import detect_intent_nlp
-
 import re
-from forex.models import Currency
 
 
 def extract_currencies(text):
@@ -54,16 +51,59 @@ def extract_currencies(text):
 
     return found
 
+
+def detect_intent(text):
+    text = text.lower()
+
+    # Rule-based detection first (higher priority)
+
+    if any(word in text for word in [
+        "compare", "difference", "vs", "versus", "between"
+    ]):
+        return "compare currencies"
+
+    if any(word in text for word in [
+        "highest", "strongest", "maximum", "max", "top", "best"
+    ]):
+        return "highest buy rate"
+
+    if any(word in text for word in [
+        "lowest", "weakest", "minimum", "min", "least"
+    ]):
+        return "lowest buy rate"
+
+    if any(word in text for word in [
+        "latest", "current", "today", "now"
+    ]):
+        return "latest exchange rate"
+
+    if any(word in text for word in [
+        "change", "increase", "decrease", "percentage"
+    ]):
+        return "rate change analysis"
+
+    if any(word in text for word in [
+        "trend", "history", "movement", "progress"
+    ]):
+        return "currency trend"
+
+    # fallback to NLP
+    return detect_intent_nlp(text)
+
+
 def chatbot_response(user_input):
     text = user_input.lower()
-    intent = detect_intent_nlp(user_input)
+
+    # IMPORTANT → use hybrid detection
+    intent = detect_intent(user_input)
+
     currencies = extract_currencies(text)
 
     # Default fallback currency
     if not currencies:
         currencies = ["USD"]
 
-    # Compare two currencies
+    # COMPARE
     if intent == "compare currencies":
         if len(currencies) >= 2:
             result = compare_currencies(currencies[0], currencies[1])
@@ -75,14 +115,14 @@ def chatbot_response(user_input):
             c2 = currencies[1]
 
             return (
-                f"Here is the information related to buy rates of {c1} and {c2} using Nepali Rupee (NRP) issued by Nepal Rastra Bank."
-                f"The latest buy rate comparison shows that {c1} has a buy rate of "
-                f"{result[c1]}, while {c2} has a buy rate of {result[c2]}. "
+                f"Here is the latest comparison between {c1} and {c2} based on Nepal Rastra Bank data. "
+                f"The buy rate of {c1} is {result[c1]}, while the buy rate of {c2} is {result[c2]}. "
+                f"This helps identify which currency currently has the stronger exchange value."
             )
 
         return "Please mention two currencies to compare, for example: compare USD and EUR."
 
-    # Highest buy rate
+    # HIGHEST
     elif intent == "highest buy rate":
         r = highest_buy_rate()
 
@@ -92,23 +132,36 @@ def chatbot_response(user_input):
         return (
             f"The highest recorded buy rate belongs to {r.currency.iso3}, "
             f"with a buy rate of {r.buy_rate}. "
-            f"This means it is currently the strongest among the available currencies in the dataset."
+            f"This means it is currently the strongest among the available currencies."
         )
 
-    # Trend
-    elif intent == "currency trend":
-        trend_data = list(get_trend(currencies[0]))
+    # LOWEST
+    elif intent == "lowest buy rate":
+        r = lowest_buy_rate()
 
-        if not trend_data:
-            return f"No trend data found for {currencies[0]}."
+        if not r:
+            return "No exchange rate data is available."
 
         return (
-            f"The trend analysis for {currencies[0]} shows how its buy rate has changed over time. "
-            f"You can use this information to observe whether the currency is increasing, decreasing, "
-            f"or remaining stable across different dates."
+            f"The lowest recorded buy rate belongs to {r.currency.iso3}, "
+            f"with a buy rate of {r.buy_rate}. "
+            f"This indicates it is currently the weakest among the available currencies."
         )
 
-    # Rate Change
+    # LATEST RATE
+    elif intent == "latest exchange rate":
+        rate = get_latest_rate(currencies[0])
+
+        if not rate:
+            return "No exchange rate data was found."
+
+        return (
+            f"The latest exchange rate for {currencies[0]} shows a buy rate of {rate.buy_rate} "
+            f"and a sell rate of {rate.sell_rate} on {rate.day.date}. "
+            f"This is the most recent available forex value for that currency."
+        )
+
+    # RATE CHANGE
     elif intent == "rate change analysis":
         result = rate_change(currencies[0])
 
@@ -120,36 +173,23 @@ def chatbot_response(user_input):
             f"which represents a percentage change of {result['percent']:.2f}%. "
             f"This helps in understanding the overall movement of the currency over time."
         )
-    
-    # Lowest rate
-    elif intent == "lowest buy rate":
-        r = lowest_buy_rate()
 
-        if not r:
-            return "No exchange rate data available."
+    # TREND
+    elif intent == "currency trend":
+        trend_data = list(get_trend(currencies[0]))
 
-        return (
-            f"The lowest recorded buy rate belongs to {r.currency.iso3}, "
-            f"with a buy rate of {r.buy_rate}. "
-            f"This indicates it is currently the weakest among the available currencies."
-        )
-
-    # Latest Rate
-    elif intent == "latest exchange rate":
-        rate = get_latest_rate(currencies[0])
-
-        if not rate:
-            return "No exchange rate data was found."
+        if not trend_data:
+            return f"No trend data found for {currencies[0]}."
 
         return (
-            f"The latest exchange rate for {currencies[0]} shows a buy rate of {rate.buy_rate} "
-            f"and a sell rate of {rate.sell_rate} on {rate.day.date}. "
-            f"This represents the most recent available forex value for that currency."
+            f"The trend analysis for {currencies[0]} shows how its buy rate has changed over time. "
+            f"This helps determine whether the currency is increasing, decreasing, "
+            f"or remaining stable across different dates."
         )
+
     else:
-        return "Sorry! Can't process the query"
+        return "Sorry, I could not understand your query."
 
-    
 
 def get_latest_rate(currency_code):
     return ExchangeRate.objects.filter(
@@ -187,7 +227,7 @@ def lowest_buy_rate():
 
 def rate_change(currency):
     rates = ExchangeRate.objects.filter(
-        currency__iso3=currency
+        currency__iso3=currency.upper()
     ).order_by("day__date")
 
     if rates.count() < 2:
@@ -207,60 +247,5 @@ def rate_change(currency):
 
 def get_trend(currency):
     return ExchangeRate.objects.filter(
-        currency__iso3=currency
+        currency__iso3=currency.upper()
     ).order_by("day__date").values("day__date", "buy_rate")
-
-
-# This part is replaced by nlp
-'''
-def detect_intent(text):
-    text = text.lower()
-
-    # Compare
-    compare_keywords = [
-        "compare", "difference", "vs", "versus", "between", "growth"
-    ]
-
-    # Highest
-    highest_keywords = [
-        "highest", "strongest", "maximum", "max", "top", "best"
-    ]
-
-    # Lowest
-    lowest_keywords = [
-        "lowest", "weakest", "minimum", "min", "least"
-    ]
-
-    # Change / Trend
-    trend_keywords = [
-        "change", "trend", "increase", "decrease",
-        "history", "movement", "progress"
-    ]
-
-    # Latest Rate
-    latest_keywords = [
-        "latest", "current", "today", "now", "rate"
-    ]
-
-    for word in compare_keywords:
-        if word in text:
-            return "compare"
-
-    for word in highest_keywords:
-        if word in text:
-            return "highest"
-
-    for word in lowest_keywords:
-        if word in text:
-            return "lowest"
-
-    for word in trend_keywords:
-        if word in text:
-            return "trend"
-
-    for word in latest_keywords:
-        if word in text:
-            return "latest"
-
-    return "unknown"
-    '''
