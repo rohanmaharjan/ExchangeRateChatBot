@@ -2,15 +2,55 @@ from forex.models import ExchangeRate, Currency
 import re
 from forex.nlp_service import detect_intent_nlp
 
+import re
+from forex.models import Currency
+
+
 def extract_currencies(text):
-    # Get all currency ISO codes from DB (USD, EUR, INR...)
-    codes = Currency.objects.values_list("iso3", flat=True)
+    text = text.upper()
+
+    # Manual alias mapping
+    currency_alias = {
+        "DOLLAR": "USD",
+        "US DOLLAR": "USD",
+        "AMERICAN DOLLAR": "USD",
+
+        "EURO": "EUR",
+
+        "POUND": "GBP",
+        "BRITISH POUND": "GBP",
+
+        "YEN": "JPY",
+        "JAPANESE YEN": "JPY",
+
+        "RUPEE": "INR",
+        "INDIAN RUPEE": "INR",
+
+        "NEPALI RUPEE": "NPR",
+        "NRS": "NPR",
+
+        "YUAN": "CNY",
+        "RENMINBI": "CNY",
+
+        "DIRHAM": "AED",
+
+        "RIYAL": "SAR"
+    }
 
     found = []
 
-    for code in codes:
-        if re.search(rf"\b{code}\b", text.upper()):
+    # STEP A → detect aliases first
+    for alias, code in currency_alias.items():
+        if alias in text and code not in found:
             found.append(code)
+
+    # STEP B → detect actual ISO codes from DB
+    db_codes = Currency.objects.values_list("iso3", flat=True)
+
+    for code in db_codes:
+        if re.search(rf"\b{code}\b", text):
+            if code not in found:
+                found.append(code)
 
     return found
 
