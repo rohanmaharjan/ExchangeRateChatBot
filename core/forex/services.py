@@ -1,5 +1,6 @@
 from forex.models import ExchangeRate, Currency
 import re
+from forex.nlp_service import detect_intent_nlp
 
 def extract_currencies(text):
     # Get all currency ISO codes from DB (USD, EUR, INR...)
@@ -15,7 +16,7 @@ def extract_currencies(text):
 
 def chatbot_response(user_input):
     text = user_input.lower()
-    intent = detect_intent(text)
+    intent = detect_intent_nlp(user_input)
     currencies = extract_currencies(text)
 
     # Default fallback currency
@@ -23,7 +24,7 @@ def chatbot_response(user_input):
         currencies = ["USD"]
 
     # Compare two currencies
-    if intent == "compare":
+    if intent == "compare currencies":
         if len(currencies) >= 2:
             result = compare_currencies(currencies[0], currencies[1])
 
@@ -42,7 +43,7 @@ def chatbot_response(user_input):
         return "Please mention two currencies to compare, for example: compare USD and EUR."
 
     # Highest buy rate
-    elif intent == "highest":
+    elif intent == "highest buy rate":
         r = highest_buy_rate()
 
         if not r:
@@ -55,7 +56,7 @@ def chatbot_response(user_input):
         )
 
     # Trend
-    elif intent == "trend":
+    elif intent == "currency trend":
         trend_data = list(get_trend(currencies[0]))
 
         if not trend_data:
@@ -68,7 +69,7 @@ def chatbot_response(user_input):
         )
 
     # Rate Change
-    elif "change" in text:
+    elif intent == "rate change analysis":
         result = rate_change(currencies[0])
 
         if not result:
@@ -81,7 +82,7 @@ def chatbot_response(user_input):
         )
     
     # Lowest rate
-    elif intent == "lowest":
+    elif intent == "lowest buy rate":
         r = lowest_buy_rate()
 
         if not r:
@@ -94,7 +95,7 @@ def chatbot_response(user_input):
         )
 
     # Latest Rate
-    elif intent == "latest":
+    elif intent == "latest exchange rate":
         rate = get_latest_rate(currencies[0])
 
         if not rate:
@@ -169,6 +170,9 @@ def get_trend(currency):
         currency__iso3=currency
     ).order_by("day__date").values("day__date", "buy_rate")
 
+
+# This part is replaced by nlp
+'''
 def detect_intent(text):
     text = text.lower()
 
@@ -219,3 +223,4 @@ def detect_intent(text):
             return "latest"
 
     return "unknown"
+    '''
